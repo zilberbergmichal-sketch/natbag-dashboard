@@ -11,13 +11,9 @@ st.title("🛫 TLV Airport Departures Dashboard - Live Feed")
 # 2. Data Fetching Function with Auto-Fallback Proxies
 @st.cache_data(ttl=300)
 def get_natbag_data():
-    # Complete direct download link to the CSV dataset file
     target_url = "https://data.gov.il"
-    
-    # URL encoding to pass the target safely through proxy strings
     encoded_url = urllib.parse.quote_plus(target_url)
     
-    # Corrected endpoints matching official proxy API standards
     proxies = [
         f"https://corsproxy.io{encoded_url}",
         f"https://allorigins.win{target_url}"
@@ -32,7 +28,6 @@ def get_natbag_data():
             response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
             
-            # Ensure the firewall didn't return an HTML block page
             if "html" in response.text.lower() or "window.rbzns" in response.text:
                 continue
                 
@@ -41,7 +36,6 @@ def get_natbag_data():
         except Exception:
             continue
             
-    # Try direct connection as a last resort
     try:
         df = pd.read_csv(target_url)
         return df
@@ -53,10 +47,16 @@ def get_natbag_data():
 df = get_natbag_data()
 
 if not df.empty:
-    # Standardize column names: strip spaces and convert to UPPERCASE
+    # Standardize column names to UPPERCASE and clean spaces
     df.columns = df.columns.str.strip().str.upper()
     
-    # Safely check if our target filter column exists
+    # FIX: Rename duplicate columns automatically to prevent Streamlit from crashing
+    cols = pd.Series(df.columns)
+    for dup in cols[cols.duplicated()].unique(): 
+        cols[cols == dup] = [f"{dup}_{i}" if i != 0 else dup for i in range(cols[cols == dup].shape[0])]
+    df.columns = cols
+
+    # Check if our target column exists
     if 'CHOPER' in df.columns:
         # Filter for Departures (D) only
         df_departures = df[df['CHOPER'] == 'D'].copy()
